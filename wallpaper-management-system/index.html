@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>壁纸管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        accent: '#f59e0b',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .wallpaper-card {
+                @apply bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+            }
+            .btn {
+                @apply px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+            }
+            .btn-primary {
+                @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
+            }
+            .btn-danger {
+                @apply bg-danger text-white hover:bg-danger/90 focus:ring-danger/50;
+            }
+            .btn-secondary {
+                @apply bg-secondary text-white hover:bg-secondary/90 focus:ring-secondary/50;
+            }
+            .btn-outline {
+                @apply border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-200;
+            }
+            .form-input {
+                @apply w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-dark flex items-center">
+                <i class="fa fa-picture-o mr-2 text-primary"></i>
+                壁纸管理系统
+            </h1>
+            <div>
+                <button id="upload-btn" class="btn btn-primary flex items-center">
+                    <i class="fa fa-upload mr-2"></i>
+                    上传壁纸
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 状态消息 -->
+        <div id="message" class="hidden mb-4 p-4 rounded-md"></div>
+        
+        <!-- 上传模态框 -->
+        <div id="upload-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 transform transition-all">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-dark">上传壁纸</h3>
+                        <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                            <i class="fa fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="upload-form" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="image" class="block text-sm font-medium text-gray-700 mb-1">选择图片</label>
+                            <input type="file" id="image" name="image" accept="image/*" class="form-input" required>
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="button" id="cancel-upload" class="btn btn-outline mr-2">取消</button>
+                            <button type="submit" class="btn btn-primary">上传</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 壁纸网格 -->
+        <div id="wallpapers-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- 壁纸卡片将通过JavaScript动态加载 -->
+            <div class="col-span-full text-center py-16 text-gray-500">
+                <i class="fa fa-folder-open-o text-5xl mb-4"></i>
+                <p class="text-lg">暂无壁纸，请上传图片</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6 mt-auto">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2025 壁纸管理系统 | 使用PHP和MySQL构建</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadBtn = document.getElementById('upload-btn');
+            const uploadModal = document.getElementById('upload-modal');
+            const closeModal = document.getElementById('close-modal');
+            const cancelUpload = document.getElementById('cancel-upload');
+            const uploadForm = document.getElementById('upload-form');
+            const wallpapersGrid = document.getElementById('wallpapers-grid');
+            const message = document.getElementById('message');
+            
+            // 打开上传模态框
+            uploadBtn.addEventListener('click', function() {
+                uploadModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden'; // 禁止背景滚动
+            });
+            
+            // 关闭上传模态框
+            function closeModalFunc() {
+                uploadModal.classList.add('hidden');
+                document.body.style.overflow = ''; // 恢复背景滚动
+                uploadForm.reset();
+            }
+            
+            closeModal.addEventListener('click', closeModalFunc);
+            cancelUpload.addEventListener('click', closeModalFunc);
+            
+            // 点击模态框外部关闭
+            uploadModal.addEventListener('click', function(e) {
+                if (e.target === uploadModal) {
+                    closeModalFunc();
+                }
+            });
+            
+            // 上传图片
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                fetch('upload.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showMessage('success', '图片上传成功');
+                        closeModalFunc();
+                        loadWallpapers();
+                    } else {
+                        showMessage('error', data.message);
+                    }
+                })
+                .catch(error => {
+                    showMessage('error', '上传过程中发生错误');
+                    console.error('Error:', error);
+                });
+            });
+            
+            // 加载壁纸
+            function loadWallpapers() {
+                fetch('get_wallpapers.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.data.length > 0) {
+                        displayWallpapers(data.data);
+                    } else {
+                        wallpapersGrid.innerHTML = `
+                            <div class="col-span-full text-center py-16 text-gray-500">
+                                <i class="fa fa-folder-open-o text-5xl mb-4"></i>
+                                <p class="text-lg">暂无壁纸，请上传图片</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    showMessage('error', '获取壁纸列表失败');
+                    console.error('Error:', error);
+                });
+            }
+            
+            // 显示壁纸
+            function displayWallpapers(wallpapers) {
+                wallpapersGrid.innerHTML = '';
+                
+                wallpapers.forEach(wallpaper => {
+                    const card = document.createElement('div');
+                    card.className = 'wallpaper-card';
+                    card.innerHTML = `
+                        <div class="relative h-64 overflow-hidden">
+                            <img src="${wallpaper.url}" alt="${wallpaper.original_name}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+                            <div class="absolute top-2 right-2 flex space-x-2">
+                                <button class="bg-white/80 hover:bg-white text-primary p-2 rounded-full shadow-md transition-all hover:scale-110" onclick="setWallpaper('${wallpaper.url}')">
+                                    <i class="fa fa-desktop"></i>
+                                </button>
+                                <button class="bg-white/80 hover:bg-white text-danger p-2 rounded-full shadow-md transition-all hover:scale-110" onclick="deleteWallpaper(${wallpaper.id})">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <h3 class="font-medium text-gray-900 truncate">${wallpaper.original_name}</h3>
+                            <div class="flex justify-between items-center mt-2 text-sm text-gray-500">
+                                <span>${wallpaper.width} × ${wallpaper.height}px</span>
+                                <span>${wallpaper.size_mb}MB</span>
+                            </div>
+                        </div>
+                    `;
+                    wallpapersGrid.appendChild(card);
+                });
+            }
+            
+            // 显示消息
+            function showMessage(type, text) {
+                message.textContent = text;
+                message.className = 'mb-4 p-4 rounded-md';
+                
+                if (type === 'success') {
+                    message.classList.add('bg-green-50', 'text-green-800', 'border-l-4', 'border-green-400');
+                } else if (type === 'error') {
+                    message.classList.add('bg-red-50', 'text-red-800', 'border-l-4', 'border-red-400');
+                }
+                
+                message.classList.remove('hidden');
+                
+                // 3秒后自动隐藏消息
+                setTimeout(() => {
+                    message.classList.add('hidden');
+                }, 3000);
+            }
+            
+            // 设置壁纸函数（在浏览器中无法直接设置桌面壁纸，这里只是提供一个示例）
+            window.setWallpaper = function(url) {
+                // 在实际应用中，这部分需要根据不同操作系统使用不同的后端实现
+                // 这里仅作为示例，弹出提示
+                alert('壁纸URL已复制，您可以手动设置：' + url);
+                navigator.clipboard.writeText(url).then(function() {
+                    showMessage('success', '壁纸URL已复制到剪贴板');
+                });
+            };
+            
+            // 删除壁纸
+            window.deleteWallpaper = function(id) {
+                if (confirm('确定要删除这张壁纸吗？此操作无法撤销。')) {
+                    fetch(`delete.php?id=${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            showMessage('success', '壁纸已删除');
+                            loadWallpapers();
+                        } else {
+                            showMessage('error', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        showMessage('error', '删除壁纸失败');
+                        console.error('Error:', error);
+                    });
+                }
+            };
+            
+            // 初始化加载壁纸
+            loadWallpapers();
+        });
+    </script>
+</body>
+</html>    
